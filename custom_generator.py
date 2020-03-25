@@ -1,6 +1,5 @@
 import math
 import random
-import time
 
 import numpy as np
 import cv2
@@ -66,10 +65,7 @@ class DataGenerator(Sequence):
         self.filename_list = _list_valid_filenames_in_directory(self.path, allowed_formats)
         self.on_epoch_end()
 
-        # self._batch_index = 0
-        # self._total_batches_seen = 0
         self.lock = threading.Lock()
-        # self._index_generator = self._flow_index()
 
     def __len__(self):
         return math.ceil(len(self.filename_list) / self.batch_size)
@@ -90,7 +86,6 @@ class DataGenerator(Sequence):
                                                 downscale_factor=self.downscale_factor,
                                                 crop_mode=self.crop_mode)
 
-        # minimal pre-processing
         # LR images : scale lr images to [0,1]
         batch_lr = preprocess_LR(batch_lr)
         # HR images : scale to [-1, 1]

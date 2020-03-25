@@ -1,25 +1,19 @@
 import os
 import shutil
 import time
-import multiprocessing
 
 import matplotlib.pyplot as plt
 import numpy as np
-from skimage import io, transform
+
 import tensorflow as tf
 import tensorflow.python.keras as keras
 import tensorflow.python.keras.backend as K
 
 from tensorflow.python.keras.applications.vgg19 import VGG19
-from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.optimizers import Adam
+
 import Network
 import utils
-import re
-# from custom_generator import DataGenerator
-from tensorflow.python.keras.callbacks import ModelCheckpoint, EarlyStopping
-from tensorflow.python.keras.mixed_precision import experimental as mixed_precision
 
 from tensorflow.python.keras.layers import Input
 
@@ -33,6 +27,7 @@ def _map_fn(image_path):
     image_high_res = (image_high_res - 0.5) * 2
 
     return image_low_res, image_high_res
+
 
 def preprocess_vgg(x):
     # scale from [-1,1] to [0, 255]
@@ -65,7 +60,7 @@ def build_vgg(target_shape_vgg):
     vgg19.trainable = False
     for layer in vgg19.layers:
         layer.trainable = False
-    
+
     vgg_model = Model(inputs=vgg19.input, outputs=vgg19.layers[20].output, name="VGG")
 
     return vgg_model
@@ -82,9 +77,8 @@ def get_gan_model(discriminator_gan, generator_gan, input_shape):
     gan_model.compile(loss=[vgg_loss, 'binary_crossentropy'], loss_weights=[1, 1e-3],
                       optimizer=common_optimizer)
 
-    tf.keras.utils.plot_model(gan_model, 'E:\\TFM\\outputs\\model_imgs\\gan_model.png', show_shapes=True)
+    # tf.keras.utils.plot_model(gan_model, 'E:\\TFM\\outputs\\model_imgs\\gan_model.png', show_shapes=True)
 
-    gan_model.summary()
     discriminator_gan.trainable = True
 
     return gan_model
@@ -107,9 +101,16 @@ if __name__ == "__main__":
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    # dataset_path = "./datasets/img_align_celeba/"
-    # dataset_path = './datasets/train2017/'
-    dataset_path = './datasets/Guadiana_final/'
+    dataset_path = './datasets/A_guadiana_final/'
+
+    # batch_gen = DataGenerator(path=dataset_path,
+    #                           batch_size=batch_size,
+    #                           downscale_factor=4,
+    #                           target_shape=target_shape,
+    #                           shuffle=True,
+    #                           crop_mode='fixed_size',
+    #                           color_mode='rgb',
+    #                           data_format=data_format)
 
     if data_format == 'channels_last':
         target_shape = target_shape + (3,)
@@ -118,12 +119,12 @@ if __name__ == "__main__":
         target_shape = (3,) + target_shape
         shape = (3, target_shape[1] // downscale_factor, target_shape[2] // downscale_factor)
 
-    # images_path_list = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
-    # files = os.listdir(dataset_path)
-    # list_files = [dataset_path + file for file in files]
+    list_file_path = 'E:\\TFM\\outputs\\listado_imagenes.npy'
+    if os.path.isfile(list_file_path):
+        list_files = np.load(list_file_path)
+    else:
+        list_files = utils.get_list_of_files(dataset_path)
 
-    # list_files = utils.get_list_of_files(dataset_path)
-    list_files = np.load('E:\\TFM\\outputs\\listado_imagenes.npy')
     np.random.shuffle(list_files)
 
     # Dataset creation.
@@ -136,39 +137,33 @@ if __name__ == "__main__":
     train_ds = train_ds.prefetch(tf.data.experimental.AUTOTUNE)
 
     iterator = train_ds.__iter__()
-    # for lr, hr in train_ds:
-    #     batch_HR = hr.numpy()
-    #     batch_LR = lr.numpy()
-
     batch_LR, batch_HR = next(iterator)
-
-    # batch_HR, batch_LR = iter.next()
-
     # batch_LR, batch_HR = batch_gen.next()
+
     print(batch_LR.numpy().shape)
     print(batch_HR.numpy().shape)
 
-    # if data_format == 'channels_first':
-    #     batch_HR = np.transpose(batch_HR, (0, 2, 3, 1))
-    #     batch_LR = np.transpose(batch_LR, (0, 2, 3, 1))
-    #
-    # fig, axes = plt.subplots(4, 2, figsize=(7, 15))
-    # for i in range(4):
-    #     axes[i, 0].imshow(utils.deprocess_LR(batch_LR.numpy()[i]).astype(np.uint8))
-    #     axes[i, 1].imshow(utils.deprocess_HR(batch_HR.numpy()[i]).astype(np.uint8))
+    if data_format == 'channels_first':
+        batch_HR = np.transpose(batch_HR, (0, 2, 3, 1))
+        batch_LR = np.transpose(batch_LR, (0, 2, 3, 1))
 
-    common_optimizer = Adam(lr=1e-5, beta_1=0.9)
-    # common_optimizer = Adam(lr=0.0002, beta_1=0.5)
+    fig, axes = plt.subplots(4, 2, figsize=(7, 15))
+    for i in range(4):
+        axes[i, 0].imshow(utils.deprocess_LR(batch_LR.numpy()[i]).astype(np.uint8))
+        axes[i, 1].imshow(utils.deprocess_HR(batch_HR.numpy()[i]).astype(np.uint8))
 
-    epochs = 1e5
+    common_optimizer = tf.keras.optimizers.Adam(lr=1e-4, beta_1=0.9)
+
+    epochs = 5
+    steps_per_epoch = int(len(list_files) // batch_size)
+
     eval_freq = 1000
     info_freq = 100
     checkpoint_freq = 2000
-    # shuffle_freq = 5000
 
-    # if os.path.isdir('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\'):
-    #     shutil.rmtree('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\')
-    # os.makedirs('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\')
+    if os.path.isdir('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\'):
+        shutil.rmtree('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\')
+    os.makedirs('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\')
 
     if os.path.isdir('E:\\TFM\\outputs\\model_imgs\\'):
         shutil.rmtree('E:\\TFM\\outputs\\model_imgs\\')
@@ -179,140 +174,103 @@ if __name__ == "__main__":
     os.makedirs('E:\\TFM\\outputs\\results\\')
 
     discriminator = Network.Discriminator(input_shape=target_shape, axis=axis, data_format=data_format).build()
-    discriminator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\discriminator.h5')
+    # discriminator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\discriminator.h5')
     discriminator.compile(loss='binary_crossentropy', optimizer=common_optimizer)
 
     generator = Network.Generator(data_format=data_format,
                                   axis=axis, shared_axis=shared_axis).build()
-    # generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5')
-    generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5')
+    generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5')
+    # generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5')
 
     features_extractor = build_vgg(target_shape)
 
     # Building and compiling the GAN
     gan = get_gan_model(discriminator_gan=discriminator, generator_gan=generator, input_shape=shape)
-    # gan = tf.keras.models.load_model('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\gan.h5', custom_objects={'vgg_loss': vgg_loss})
 
     d_losses_fake = []
     d_losses_real = []
     g_losses_mse_vgg = []
     g_losses_cxent = []
     epochs_list = []
-    latest_loss = 0.0037
-    start = time.time()
+    latest_loss = 8000
     for epoch in range(int(epochs)):
+        start = time.time()
+        print('Epoch {}/{}'.format(epoch, epochs))
 
-        # if epoch % shuffle_freq == 0 and epoch != 0:
-        #     np.random.shuffle(list_files)
+        for step in range(int(steps_per_epoch)):
 
-        if epoch % info_freq == 0 and epoch != 0:
-            print('Epoch {} : '.format(epoch))
-            print("\t d_loss_fake = {:.4f} | d_loss_real = {:.4f}".format(np.mean(d_losses_fake[-info_freq::]),
-                                                                          np.mean(d_losses_real[-info_freq::])))
-            print("\t g_loss_mse_vgg = {:.4f} | g_loss_cxent = {:.4f}".format(
-                np.mean(g_losses_mse_vgg[-info_freq::]),
-                np.mean(g_losses_cxent[-info_freq::])))
-            print("\t {:.4f} seconds per step\n".format(float(time.time() - start) / epoch))
+            # Every info_freq print training info.
+            if step % info_freq == 0 and step != 0:
+                print('Epoch {} : '.format(epoch))
+                print("\t d_loss_fake = {:.4f} | d_loss_real = {:.4f}".format(np.mean(d_losses_fake[-info_freq::]),
+                                                                              np.mean(d_losses_real[-info_freq::])))
+                print("\t g_loss_mse_vgg = {:.4f}".format(np.mean(g_losses_mse_vgg[-info_freq::])))
+                print("\t {:.4f} seconds per step\n".format(float(time.time() - start) / step))
 
-        # Sample and save images after every 100 epochs
-        if epoch % eval_freq == 0:
-            # hr_images, lr_images = batchGenerator(path=dataset_path, batch_size=batch_size,
-            #                                       low_resolution_shape=shape,
-            #                                       high_resolution_shape=target_shape, training_mode=False)
-            # lr_images, hr_images = batch_gen.next()
-            lr_images, hr_images = next(iterator)
-            gen_hr_images = generator.predict(lr_images)
+            # Every eval_freq saves a batch of images and their predictions into results folder.
+            if step % eval_freq == 0:
+                # lr_images, hr_images = batch_gen.next()
+                lr_images, hr_images = next(iterator)
+                gen_hr_images = generator.predict(lr_images)
 
-            for index, img in enumerate(gen_hr_images):
-                lr_image = lr_images[index]
-                hr_image = hr_images[index]
-                sr_image = img
+                for index, img in enumerate(gen_hr_images):
+                    lr_image = lr_images[index]
+                    hr_image = hr_images[index]
+                    sr_image = img
 
-                utils.save_images(low_resolution_image=lr_image, original_image=hr_image,
-                                  generated_image=sr_image,
-                                  path="E:\\TFM\\outputs\\results\\img_{}_{}".format(epoch, index),
-                                  data_format=data_format)
+                    utils.save_images(low_resolution_image=lr_image, original_image=hr_image,
+                                      generated_image=sr_image,
+                                      path="E:\\TFM\\outputs\\results\\img_{}_{}_{}".format(epoch, step, index),
+                                      data_format=data_format)
 
-        if epoch % checkpoint_freq == 0 and epoch != 0:
+            # Every checkpoint_freq discriminator and generator weights are saved.
+            if step % checkpoint_freq == 0 and step != 0:
 
-            current_loss = np.mean(g_losses_mse_vgg[-info_freq::])
-            generator.save_weights(
-                "E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_{}_{:.4f}.h5".format(epoch, current_loss),
-                overwrite=True)
-
-            if latest_loss > current_loss:
+                current_loss = np.mean(g_losses_mse_vgg[-info_freq::])
                 generator.save_weights(
-                    "E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5",
+                    "E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_{}_{:.4f}.h5".format(epoch, current_loss),
                     overwrite=True)
 
-                print("Model upgraded from {:4f} to {:4f}.\n".format(latest_loss,
-                                                                     np.mean(g_losses_mse_vgg[-info_freq::])))
-                latest_loss = current_loss
-            else:
-                print("Model not upgraded: {:4f} is lower than {:4f}.\n".format(latest_loss,
-                                                                                np.mean(g_losses_mse_vgg[
-                                                                                        -info_freq::])))
-            # discriminator.trainable = False
-            # tf.keras.models.save_model(gan, "E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\gan.h5")
+                if latest_loss > current_loss:
+                    generator.save_weights(
+                        "E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5",
+                        overwrite=True)
 
-            # discriminator.trainable = True
-            # tf.keras.models.save_model(discriminator, "E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\discriminator.h5")
-            discriminator.save_weights("E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\discriminator.h5",
-                                       overwrite=True)
-        print('-' * 15, 'Epoch %d' % epoch, '-' * 15)
+                    print("Model upgraded from {:4f} to {:4f}.\n".format(latest_loss,
+                                                                         np.mean(g_losses_mse_vgg[-info_freq::])))
+                    latest_loss = current_loss
+                else:
+                    print("Model not upgraded -> {:4f} is lower than {:4f}.\n".format(latest_loss,
+                                                                                      np.mean(g_losses_mse_vgg[
+                                                                                              -info_freq::])))
 
-        discriminator.trainable = True
+                discriminator.save_weights("E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\discriminator.h5",
+                                           overwrite=True)
+            print('Step {}/{}'.format(step, steps_per_epoch))
 
-        # Sample a batch of images
-        # hr_images, lr_images = batchGenerator(path=dataset_path, batch_size=batch_size,
-        #                                       low_resolution_shape=shape,
-        #                                       high_resolution_shape=target_shape, training_mode=True)
-        # lr_images, hr_images = batch_gen.next()
-        lr_images, hr_images = next(iterator)
-        sr_images = generator.predict(lr_images)
+            discriminator.trainable = True
 
-        # Generate batch of labels
-        real_labels = np.random.uniform(0.7, 1.0, size=batch_size).astype(np.float32)
-        fake_labels = np.random.uniform(0.0, 0.3, size=batch_size).astype(np.float32)
-        # real_labels = np.ones((batch_size, 1))Esto es de valores totales. El otro es con etiquetas con ruido.
+            # lr_images, hr_images = batch_gen.next()
+            lr_images, hr_images = next(iterator)
+            sr_images = generator.predict(lr_images)
 
-        d_loss_real = discriminator.train_on_batch(hr_images, real_labels)
-        d_losses_real.append(d_loss_real)
+            # Generate batch of fake and real labels. They are randomized in order to force the discriminator to improve
+            # further.
+            real_labels = np.random.uniform(0.7, 1.0, size=batch_size).astype(np.float32)
+            fake_labels = np.random.uniform(0.0, 0.3, size=batch_size).astype(np.float32)
 
-        d_loss_fake = discriminator.train_on_batch(sr_images, fake_labels)
-        d_losses_fake.append(d_loss_fake)
+            d_loss_real = discriminator.train_on_batch(hr_images, real_labels)
+            d_losses_real.append(d_loss_real)
 
-        discriminator.trainable = False
+            d_loss_fake = discriminator.train_on_batch(sr_images, fake_labels)
+            d_losses_fake.append(d_loss_fake)
 
-        # hr_images, lr_images = batchGenerator(path=dataset_path, batch_size=batch_size,
-        #                                       low_resolution_shape=shape,
-        #                                       high_resolution_shape=target_shape, training_mode=True)
-        # lr_images, hr_images = batch_gen.next()
-        lr_images, hr_images = next(iterator)
-        # print(hr_images.numpy().shape[0])
-        # real_features = vgg.predict(hr_images)
-        labels_contrarias = np.ones((batch_size, 1)).astype(np.float32)
+            discriminator.trainable = False
 
-        # Train the generator network
-        # g_loss = gan.train_on_batch(lr_images, [labels_contrarias, real_features])
-        g_loss = gan.train_on_batch(lr_images, [hr_images, labels_contrarias])
-        g_losses_mse_vgg.append(g_loss[0])
-        g_losses_cxent.append(g_loss[1])
+            # lr_images, hr_images = batch_gen.next()
+            lr_images, hr_images = next(iterator)
+            opposite_labels = np.ones((batch_size, 1)).astype(np.float32)
 
-        # if epoch % 10 == 0:
-        #     d_losses.append(d_loss[0])
-        #     g_losses.append(g_loss[0])
-        #     epochs_list.append(epoch)
-        #
-        #     plt.figure()
-        #
-        #     plt.subplot(211)
-        #     plt.plot(epochs_list, d_losses)
-        #     plt.title("Discriminator loss")
-        #
-        #     plt.subplot(212)
-        #     plt.plot(epochs_list, g_losses)
-        #     plt.title("GAN loss")
-        #
-        #     plt.savefig("graphs/epoch_{}".format(epoch))
-        #     plt.close()
+            # Train the generator network
+            g_loss = gan.train_on_batch(lr_images, [hr_images, opposite_labels])
+            g_losses_mse_vgg.append(g_loss[0])

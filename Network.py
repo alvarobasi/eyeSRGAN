@@ -4,7 +4,7 @@ from tensorflow.python.keras.layers import Input, Conv2D, LeakyReLU, PReLU, UpSa
 from tensorflow.python.keras.models import Model
 
 
-# Residual block
+# Residual block.
 def res_block(inputs, axis, shared_axis):
     x = Conv2D(64, kernel_size=(3, 3), strides=(1, 1), padding='same', activation=None, use_bias=False)(inputs)
     x = BatchNormalization(axis=axis)(x)
@@ -15,6 +15,7 @@ def res_block(inputs, axis, shared_axis):
     return add([x, inputs])
 
 
+# Upsampling block.
 def up_block(x, shared_axis):
     x = Conv2D(256, kernel_size=(3, 3), strides=(1, 1), padding='same', activation=None, use_bias=False)(x)
     x = UpSampling2D(size=(2, 2))(x)
@@ -22,7 +23,17 @@ def up_block(x, shared_axis):
     return x
 
 
+# Generator architecture based on paper. https://arxiv.org/pdf/1609.04802.pdf.
+# Implements build() method returning a tf.keras.Model object.
 class Generator(object):
+    """
+        :param data_format: order of image dimensions:
+            - channels_first -> (C, H, W)
+            - channels_last -> (H, W, C)
+        :param axis: -1 if channels_last, 1 if channels_first
+        :param shared_axis: [1, 2] if channels_last, [2, 3] if channels_first
+        :param input_shape: input_shape of the Generator network.
+    """
 
     def __init__(self, data_format, axis, shared_axis, input_shape=None):
         self.shared_axis = shared_axis
@@ -48,26 +59,27 @@ class Generator(object):
 
         x = x_input_res_block
 
-        # add B residual blocks
+        # Add B residual blocks.
         for _ in range(self.B):
             x = res_block(x, self.axis, self.shared_axis)
 
         x = Conv2D(64, kernel_size=(3, 3), strides=(1, 1), padding='same', activation=None, use_bias=False)(x)
         x = BatchNormalization(axis=self.axis)(x)
 
-        # skip connection
+        # Skip connection.
         x = add([x, x_input_res_block])
 
-        # two upscale blocks
+        # Two upsampling blocks.
         x = up_block(x, self.shared_axis)
         x = up_block(x, self.shared_axis)
 
-        # final conv layer : activated with tanh -> pixels in [-1, 1]
+        # Output of the generator. Convolution layer with tanh activation ([-1, 1] image values).
         output_generator = Conv2D(3, kernel_size=(9, 9),
                                   strides=(1, 1), activation='tanh',
                                   use_bias=False, padding='same')(x)
 
-        generator = Model(inputs=input_generator, outputs=output_generator, name="Generador")
+        # Model creation.
+        generator = Model(inputs=input_generator, outputs=output_generator, name="Generator")
 
         # tf.keras.utils.plot_model(generator, 'E:\\TFM\\outputs\\model_imgs\\generator_model.png',
         #                           show_shapes=True)
@@ -75,6 +87,7 @@ class Generator(object):
         return generator
 
 
+# Convolutional block.
 def conv_block(x, filters, kernel_size, strides, axis):
     x = Conv2D(filters, kernel_size=kernel_size, strides=strides,
                activation=None, use_bias=False, padding='same')(x)
@@ -83,8 +96,16 @@ def conv_block(x, filters, kernel_size, strides, axis):
     return x
 
 
-# Network Architecture is same as given in Paper https://arxiv.org/pdf/1609.04802.pdf
+# Discriminator architecture based on paper. https://arxiv.org/pdf/1609.04802.pdf.
+# Implements build() method returning a tf.keras.Model object.
 class Discriminator(object):
+    """
+        :param data_format: order of image dimensions:
+            - channels_first -> (C, H, W)
+            - channels_last -> (H, W, C)
+        :param axis: -1 if channels_last, 1 if channels_first
+        :param input_shape: input_shape of the Discriminator network.
+    """
 
     def __init__(self, input_shape, data_format, axis):
         self.input_shape = input_shape
@@ -112,9 +133,7 @@ class Discriminator(object):
 
         discriminator_model = Model(inputs=input_discriminator, outputs=output_discriminator, name="Discriminador")
 
-        tf.keras.utils.plot_model(discriminator_model, 'E:\\TFM\\outputs\\model_imgs\\discriminator_model.png',
-                                  show_shapes=True)
-
-        discriminator_model.summary()
+        # tf.keras.utils.plot_model(discriminator_model, 'E:\\TFM\\outputs\\model_imgs\\discriminator_model.png',
+        #                           show_shapes=True)
 
         return discriminator_model

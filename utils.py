@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 from tensorflow.python.client import device_lib
 import os
@@ -119,8 +118,8 @@ def save_images(low_resolution_image, original_image, generated_image, path, dat
         original_image = np.transpose(original_image, (0, 3, 1, 2))
         generated_image = np.transpose(generated_image, (0, 3, 1, 2))
 
-    io.imsave(path + '_orig_image.png', deprocess_HR(original_image).astype(np.uint8))
-    io.imsave(path + '_gen_image.png', deprocess_HR(generated_image).astype(np.uint8))
+    io.imsave(path + '_orig.png', deprocess_HR(original_image).astype(np.uint8))
+    io.imsave(path + '_gen.png', deprocess_HR(generated_image).astype(np.uint8))
 
     # fig = plt.figure()
     # ax = fig.add_subplot(1, 3, 1)

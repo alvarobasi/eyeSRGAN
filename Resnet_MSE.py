@@ -28,12 +28,15 @@ def _map_fn(image_path):
 
 if __name__ == "__main__":
 
+    # Show compute policy in order to check mixed_precision capability.
     print('Compute dtype: %s' % tf.keras.mixed_precision.experimental.global_policy().compute_dtype)
     print('Variable dtype: %s' % tf.keras.mixed_precision.experimental.global_policy().variable_dtype)
 
     allowed_formats = {'png', 'jpg', 'jpeg', 'bmp'}
+
     data_format = 'channels_last'
     tf.keras.backend.set_image_data_format(data_format)
+
     print("Keras: ", tf.keras.__version__)
     print("Tensorflow: ", tf.__version__)
     print("Image format: ", tf.keras.backend.image_data_format())
@@ -47,15 +50,6 @@ if __name__ == "__main__":
     axis = -1 if data_format == 'channels_last' else 1
 
     dataset_path = './datasets/A_guadiana_final/'
-
-    # batch_gen = DataGenerator(path=dataset_path,
-    #                           batch_size=batch_size,
-    #                           downscale_factor=4,
-    #                           target_shape=target_shape,
-    #                           shuffle=True,
-    #                           crop_mode='fixed_size',
-    #                           color_mode='rgb',
-    #                           data_format=data_format)
 
     if data_format == 'channels_last':
         target_shape = target_shape + (3,)
@@ -73,7 +67,8 @@ if __name__ == "__main__":
     np.random.shuffle(list_files)
 
     # Dataset creation.
-    train_ds = tf.data.Dataset.from_tensor_slices(list_files).map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    train_ds = tf.data.Dataset.from_tensor_slices(list_files).map(_map_fn,
+                                                                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
     # train_ds = train_ds.cache()
     train_ds = train_ds.shuffle(5000)
     train_ds = train_ds.repeat(count=-1)
@@ -82,7 +77,7 @@ if __name__ == "__main__":
     
     # num_steps = 1e5
     # steps_per_epoch = 5000
-    epochs = 20
+    epochs = 5
     steps_per_epoch = int(len(list_files) // batch_size)
     # epochs = int(num_steps // steps_per_epoch)
 

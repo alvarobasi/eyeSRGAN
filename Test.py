@@ -35,7 +35,7 @@ if __name__ == "__main__":
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    dataset_path = './datasets/User_20/'
+    dataset_path = './datasets/User_19/'
 
     # batch_gen = DataGenerator(path=dataset_path,
     #                           batch_size=batch_size,
@@ -58,6 +58,7 @@ if __name__ == "__main__":
         list_files = np.load(list_file_path)
     else:
         list_files = utils.get_list_of_files(dataset_path)
+        np.save(list_file_path, list_files)
 
     np.random.shuffle(list_files)
 

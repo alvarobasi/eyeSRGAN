@@ -124,6 +124,7 @@ if __name__ == "__main__":
         list_files = np.load(list_file_path)
     else:
         list_files = utils.get_list_of_files(dataset_path)
+        np.save(list_file_path, list_files)
 
     np.random.shuffle(list_files)
 

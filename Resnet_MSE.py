@@ -32,8 +32,6 @@ if __name__ == "__main__":
     print('Compute dtype: %s' % tf.keras.mixed_precision.experimental.global_policy().compute_dtype)
     print('Variable dtype: %s' % tf.keras.mixed_precision.experimental.global_policy().variable_dtype)
 
-    allowed_formats = {'png', 'jpg', 'jpeg', 'bmp'}
-
     data_format = 'channels_last'
     tf.keras.backend.set_image_data_format(data_format)
 
@@ -63,6 +61,7 @@ if __name__ == "__main__":
         list_files = np.load(list_file_path)
     else:
         list_files = utils.get_list_of_files(dataset_path)
+        np.save(list_file_path, list_files)
     
     np.random.shuffle(list_files)
 
@@ -92,17 +91,18 @@ if __name__ == "__main__":
     # generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5')
     generator.compile(loss='mse', optimizer=common_optimizer)
 
-    checkpoint = ModelCheckpoint(filepath='E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\weights.{''epoch:02d}-{loss:.4f}.hdf5',
+    checkpoint = ModelCheckpoint(filepath='E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\weights.{''epoch:02d}-{'
+                                          'loss:.4f}.hdf5',
                                  monitor='loss',
                                  save_weights_only=True,
-                                 period=2,
+                                 save_freq=10000,
                                  verbose=2)
 
     best_checkpoint = ModelCheckpoint(filepath='E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5',
                                       monitor='loss',
                                       save_weights_only=True,
                                       save_best_only=True,
-                                      period=1,
+                                      save_freq=5000,
                                       verbose=2)
 
     early_stop = EarlyStopping(monitor='loss', min_delta=0, patience=2, verbose=1, mode='min')

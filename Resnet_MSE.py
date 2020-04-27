@@ -61,7 +61,7 @@ if __name__ == "__main__":
         list_files = np.load(list_file_path)
     else:
         list_files = utils.get_list_of_files(dataset_path)
-        np.save(list_file_path, list_files)
+        # np.save(list_file_path, list_files)
     
     np.random.shuffle(list_files)
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     
     # num_steps = 1e5
     # steps_per_epoch = 5000
-    epochs = 5
+    epochs = 3
     steps_per_epoch = int(len(list_files) // batch_size)
     # epochs = int(num_steps // steps_per_epoch)
 
@@ -95,14 +95,14 @@ if __name__ == "__main__":
                                           'loss:.4f}.hdf5',
                                  monitor='loss',
                                  save_weights_only=True,
-                                 save_freq=10000,
+                                 save_freq=2000,
                                  verbose=2)
 
     best_checkpoint = ModelCheckpoint(filepath='E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5',
                                       monitor='loss',
                                       save_weights_only=True,
                                       save_best_only=True,
-                                      save_freq=5000,
+                                      save_freq=2000,
                                       verbose=2)
 
     early_stop = EarlyStopping(monitor='loss', min_delta=0, patience=2, verbose=1, mode='min')

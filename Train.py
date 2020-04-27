@@ -155,12 +155,12 @@ if __name__ == "__main__":
 
     common_optimizer = tf.keras.optimizers.Adam(lr=1e-4, beta_1=0.9)
 
-    epochs = 5
+    epochs = 2
     steps_per_epoch = int(len(list_files) // batch_size)
 
     eval_freq = 1000
     info_freq = 100
-    checkpoint_freq = 2000
+    checkpoint_freq = 5000
 
     if os.path.isdir('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\'):
         shutil.rmtree('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\')

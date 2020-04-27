@@ -96,6 +96,7 @@ def list_valid_filenames_in_directory(directory, white_list_formats):
 
 # # Función importada de Gonzalo. Va iterando a través de las carpetas hasta recorrer los directorios enteros en
 # busca de las imagenes. Devuelve la lista con todas las imagenes .png que cumplen con el patrón dado.
+# Se ha modificado la función para que coja las _padded.png
 def get_list_of_files(folder):
     # Function to search folders and subfolders to obtain all png files
     files_in_folder = os.listdir(folder)
@@ -107,7 +108,7 @@ def get_list_of_files(folder):
         # If entry is a directory then get the list of files in this directory
         if os.path.isdir(full_path):
             output_files = output_files + get_list_of_files(full_path)
-        elif re.match(r'\d{2}.png', entry):
+        elif re.match(r'\d{2}_padded.png', entry):
             output_files.append(full_path)
     return output_files
 

@@ -29,14 +29,14 @@ if __name__ == "__main__":
     print("Image format: ", tf.keras.backend.image_data_format())
     utils.print_available_devices()
 
-    batch_size = 2
+    batch_size = 4
     target_shape = (84, 388)
     downscale_factor = 4
 
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    dataset_path = './datasets/User_20/'
+    dataset_path = './datasets/Quitados_guadiana/'
 
     # batch_gen = DataGenerator(path=dataset_path,
     #                           batch_size=batch_size,
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     model_path_srgan = 'E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5'
 
     # lr_images, hr_images = batch_gen.next()
-    _, hr_images = next(iterator)
+    lr_images, hr_images = next(iterator)
 
     generator_mse = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
     generator_srgan = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
@@ -86,22 +86,33 @@ if __name__ == "__main__":
 
     predicted_images_mse = generator_mse.predict(hr_images)
     predicted_images_srgan = generator_srgan.predict(hr_images)
+    predicted_images_lowres = generator_srgan.predict(lr_images)
 
     for index in range(batch_size):
         fig = plt.figure()
-        ax = fig.add_subplot(1, 3, 1)
+        ax = fig.add_subplot(5, 1, 1)
         ax.imshow(utils.deprocess_HR(predicted_images_mse[index]).astype(np.uint8))
         ax.axis("off")
         ax.set_title("MSE")
 
-        ax = fig.add_subplot(1, 3, 2)
+        ax = fig.add_subplot(5, 1, 2)
         ax.imshow(utils.deprocess_LR(hr_images[index]).astype(np.uint8))
         ax.axis("off")
         ax.set_title("Original")
 
-        ax = fig.add_subplot(1, 3, 3)
+        ax = fig.add_subplot(5, 1, 3)
         ax.imshow(utils.deprocess_HR(predicted_images_srgan[index]).astype(np.uint8))
         ax.axis("off")
         ax.set_title("SRGAN")
+
+        ax = fig.add_subplot(5, 1, 4)
+        ax.imshow(utils.deprocess_LR(lr_images[index]).astype(np.uint8))
+        ax.axis("off")
+        ax.set_title("Low-res")
+
+        ax = fig.add_subplot(5, 1, 5)
+        ax.imshow(utils.deprocess_HR(predicted_images_lowres[index]).astype(np.uint8))
+        ax.axis("off")
+        ax.set_title("Predicted-high-res")
 
         plt.show()

@@ -90,7 +90,8 @@ def list_valid_filenames_in_directory(directory, white_list_formats):
             if is_valid:
                 # add filename relative to directory
                 absolute_path = os.path.join(root, fname)
-                filenames.append(os.path.relpath(absolute_path, basedir))
+                # filenames.append(os.path.relpath(absolute_path, basedir))
+                filenames.append(absolute_path)
     return filenames
 
 

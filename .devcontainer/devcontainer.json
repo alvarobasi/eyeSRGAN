@@ -1,0 +1,25 @@
+{
+  "name": "TensorFlowGPU",
+  "dockerFile": "Dockerfile",
+  "runArgs": [
+    "--gpus", "all",
+  // Uncomment the next line to use a non-root user. On Linux, this will prevent
+  // new files getting created as root, but you may need to update the USER_UID
+  // and USER_GID in .devcontainer/Dockerfile to match your user if not 1000.
+  "-u", "vscode"
+  ],
+  "settings": {
+  "terminal.integrated.shell.linux": "/bin/bash",
+  "python.pythonPath": "/usr/local/bin/python",
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.linting.pylintPath": "/usr/local/bin/pylint",
+  "python.linting.mypyEnabled": true,
+  "python.linting.mypyPath": "/usr/local/bin/mypy",
+  "python.formatting.autopep8Path": "/usr/local/bin/autopep8"
+  },
+  "postCreateCommand": "pip install -r requirements.txt",
+  "extensions": [
+  "ms-python.python"
+  ]
+}

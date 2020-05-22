@@ -20,6 +20,10 @@ def _map_fn(image_path):
 
 if __name__ == "__main__":
 
+    # Si no pongo esto casca. Da error de cuDNN
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
     allowed_formats = {'png', 'jpg', 'jpeg', 'bmp'}
     data_format = 'channels_last'
     tf.keras.backend.set_image_data_format(data_format)
@@ -35,7 +39,7 @@ if __name__ == "__main__":
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    dataset_path = './datasets/Quitados_guadiana/User_13/'
+    dataset_path = './datasets/Removed/'
 
     # batch_gen = DataGenerator(path=dataset_path,
     #                           batch_size=batch_size,
@@ -53,12 +57,13 @@ if __name__ == "__main__":
         target_shape = (3,) + target_shape
         shape = (3, target_shape[1] // downscale_factor, target_shape[2] // downscale_factor)
 
-    list_file_path = 'E:\\TFM\\outputs\\listado_imagenes_test.npy'
+    # list_file_path = 'E:\\TFM\\outputs\\listado_imagenes_test.npy'
+    list_file_path = './outputs/listado_imagenes_test.npy'
     if os.path.isfile(list_file_path):
         list_files = np.load(list_file_path)
     else:
         list_files = utils.get_list_of_files(dataset_path)
-        # np.save(list_file_path, list_files)
+        np.save(list_file_path, list_files)
 
     np.random.shuffle(list_files)
 
@@ -72,7 +77,8 @@ if __name__ == "__main__":
 
     iterator = train_ds.__iter__()
 
-    model_path = 'E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5'
+    # model_path = 'E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5'
+    model_path = './outputs/checkpoints/SRResNet-MSE/est_weights.hdf5'
     # model_path = 'E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5'
 
     # lr_images, hr_images = batch_gen.next()
@@ -100,4 +106,4 @@ if __name__ == "__main__":
         ax.axis("off")
         ax.set_title("Generated")
 
-        plt.show()
+        fig.savefig('./outputs/salida.png')

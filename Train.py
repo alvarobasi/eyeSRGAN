@@ -15,6 +15,8 @@ from tensorflow.python.keras.models import Model
 import Network
 import utils
 
+#import custom_generator
+
 from tensorflow.python.keras.layers import Input
 
 
@@ -69,7 +71,7 @@ def build_vgg(target_shape_vgg):
 def get_gan_model(discriminator_gan, generator_gan, input_shape):
     discriminator_gan.trainable = False
 
-    input_gan = Input(shape=input_shape, name="Entrada_GAN")
+    input_gan = Input(shape=input_shape, name="SRGAN_Input")
     output_generator = generator_gan(input_gan)
     output_discriminator = discriminator_gan(output_generator)
 
@@ -86,7 +88,20 @@ def get_gan_model(discriminator_gan, generator_gan, input_shape):
 
 if __name__ == "__main__":
 
+    # Activa o desactiva la compilación XLA para acelerar un poco el entrenamiento.
+    tf.config.optimizer.set_jit(True)
+
+    amp_mode = True
+
     allowed_formats = {'png', 'jpg', 'jpeg', 'bmp'}
+
+    # Si no pongo esto, por alguna razón casca. Da error de cuDNN. 
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
+    if amp_mode:
+        tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
+
     data_format = 'channels_last'
     keras.backend.set_image_data_format(data_format)
     print("Keras: ", keras.__version__)
@@ -94,7 +109,7 @@ if __name__ == "__main__":
     print("Image format: ", keras.backend.image_data_format())
     utils.print_available_devices()
 
-    batch_size = 6
+    batch_size = 10
     target_shape = (84, 388)
     downscale_factor = 4
 
@@ -102,6 +117,7 @@ if __name__ == "__main__":
     axis = -1 if data_format == 'channels_last' else 1
 
     dataset_path = './datasets/A_guadiana_final/'
+    # dataset_path = './datasets/img_align_celeba/'
 
     # batch_gen = DataGenerator(path=dataset_path,
     #                           batch_size=batch_size,
@@ -119,23 +135,22 @@ if __name__ == "__main__":
         target_shape = (3,) + target_shape
         shape = (3, target_shape[1] // downscale_factor, target_shape[2] // downscale_factor)
 
-    list_file_path = 'E:\\TFM\\outputs\\listado_imagenes.npy'
-    if os.path.isfile(list_file_path):
-        list_files = np.load(list_file_path)
-    else:
-        list_files = utils.get_list_of_files(dataset_path)
-        np.save(list_file_path, list_files)
-
+    # list_file_path = './outputs/listado_imagenes.npy'
+    # if os.path.isfile(list_file_path):
+    #     list_files = np.load(list_file_path)
+    # else:
+    #     list_files = utils.get_list_of_files(dataset_path)
+    #     np.save(list_file_path, list_files)
+    list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
     np.random.shuffle(list_files)
 
-    # Dataset creation.
-    train_ds = tf.data.Dataset.from_tensor_slices(list_files).map(_map_fn,
-                                                                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    # train_ds = train_ds.cache()
-    train_ds = train_ds.shuffle(5000)
+    # Dataset creation.temporal
+    train_ds = tf.data.Dataset.from_tensor_slices(list_files)
+    train_ds = train_ds.shuffle(buffer_size=1000)
     train_ds = train_ds.repeat(count=-1)
+    train_ds = train_ds.map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     train_ds = train_ds.batch(batch_size)
-    train_ds = train_ds.prefetch(tf.data.experimental.AUTOTUNE)
+    train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     iterator = train_ds.__iter__()
     batch_LR, batch_HR = next(iterator)
@@ -162,25 +177,24 @@ if __name__ == "__main__":
     info_freq = 100
     checkpoint_freq = 5000
 
-    if os.path.isdir('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\'):
-        shutil.rmtree('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\')
-    os.makedirs('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\')
+    if os.path.isdir('./outputs/checkpoints/SRGAN-VGG54/'):
+        shutil.rmtree('./outputs/checkpoints/SRGAN-VGG54/')
+    os.makedirs('./outputs/checkpoints/SRGAN-VGG54/')
 
-    if os.path.isdir('E:\\TFM\\outputs\\model_imgs\\'):
-        shutil.rmtree('E:\\TFM\\outputs\\model_imgs\\')
-    os.makedirs('E:\\TFM\\outputs\\model_imgs\\')
+    if os.path.isdir('./outputs/model_imgs/'):
+        shutil.rmtree('./outputs/model_imgs/')
+    os.makedirs('./outputs/model_imgs/')
 
-    if os.path.isdir('E:\\TFM\\outputs\\results\\'):
-        shutil.rmtree('E:\\TFM\\outputs\\results\\')
-    os.makedirs('E:\\TFM\\outputs\\results\\')
+    if os.path.isdir('./outputs/results/'):
+        shutil.rmtree('./outputs/results/')
+    os.makedirs('./outputs/results/')
 
     discriminator = Network.Discriminator(input_shape=target_shape, axis=axis, data_format=data_format).build()
     # discriminator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\discriminator.h5')
     discriminator.compile(loss='binary_crossentropy', optimizer=common_optimizer)
 
-    generator = Network.Generator(data_format=data_format,
-                                  axis=axis, shared_axis=shared_axis).build()
-    generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5')
+    generator = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
+    generator.load_weights('./saved_weights/SRResNet-MSE/best_weights.hdf5')
     # generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5')
 
     features_extractor = build_vgg(target_shape)
@@ -221,7 +235,7 @@ if __name__ == "__main__":
 
                     utils.save_images(low_resolution_image=lr_image, original_image=hr_image,
                                       generated_image=sr_image,
-                                      path="E:\\TFM\\outputs\\results\\img_{}_{}_{}".format(epoch, step, index),
+                                      path="./outputs/results/img_{}_{}_{}".format(epoch, step, index),
                                       data_format=data_format)
 
             # Every checkpoint_freq discriminator and generator weights are saved.
@@ -229,12 +243,12 @@ if __name__ == "__main__":
 
                 current_loss = np.mean(g_losses_mse_vgg[-info_freq::])
                 generator.save_weights(
-                    "E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_{}_{:.4f}.h5".format(epoch, current_loss),
+                    "./outputs/checkpoints/SRGAN-VGG54/generator_{}_{:.4f}.h5".format(epoch, current_loss),
                     overwrite=True)
 
                 if latest_loss > current_loss:
                     generator.save_weights(
-                        "E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5",
+                        "./outputs/checkpoints/SRGAN-VGG54/generator_best.h5",
                         overwrite=True)
 
                     print("Model upgraded from {:4f} to {:4f}.\n".format(latest_loss,
@@ -245,7 +259,7 @@ if __name__ == "__main__":
                                                                                       np.mean(g_losses_mse_vgg[
                                                                                               -info_freq::])))
 
-                discriminator.save_weights("E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\discriminator.h5",
+                discriminator.save_weights("./outputs/checkpoints/SRGAN-VGG54/discriminator.h5",
                                            overwrite=True)
             print('Step {}/{}'.format(step, steps_per_epoch))
 

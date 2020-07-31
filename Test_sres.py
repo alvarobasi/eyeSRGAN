@@ -36,7 +36,8 @@ if __name__ == "__main__":
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    dataset_path = './datasets/Quitados_guadiana/'
+    # dataset_path = './datasets/Quitados_guadiana/'
+    dataset_path = './datasets/I2Head_f_recortada/'
 
     # batch_gen = DataGenerator(path=dataset_path,
     #                           batch_size=batch_size,
@@ -65,15 +66,17 @@ if __name__ == "__main__":
     # Dataset creation.
     train_ds = tf.data.Dataset.from_tensor_slices(list_files).map(_map_fn,
                                                                   num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    train_ds = train_ds.shuffle(5000)
+    train_ds = train_ds.shuffle(400)
     train_ds = train_ds.repeat(count=-1)
     train_ds = train_ds.batch(batch_size)
     train_ds = train_ds.prefetch(tf.data.experimental.AUTOTUNE)
 
     iterator = train_ds.__iter__()
 
-    model_path_mse = 'E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5'
-    model_path_srgan = 'E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5'
+    # model_path_mse = 'E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5'
+    # model_path_srgan = 'E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5'
+    model_path_srgan = 'saved_weights/SRGAN-VGG54/generator_best.h5'
+    model_path_mse = 'saved_weights/SRResNet-MSE/best_weights.hdf5'
 
     # lr_images, hr_images = batch_gen.next()
     lr_images, hr_images = next(iterator)

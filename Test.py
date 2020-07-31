@@ -65,12 +65,12 @@ if __name__ == "__main__":
         list_files = utils.get_list_of_files(dataset_path)
         np.save(list_file_path, list_files)
 
-    np.random.shuffle(list_files)
+    # np.random.shuffle(list_files)
 
     # Dataset creation.
     train_ds = tf.data.Dataset.from_tensor_slices(list_files).map(_map_fn,
                                                                   num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    train_ds = train_ds.shuffle(5000)
+    # train_ds = train_ds.shuffle(5000)
     train_ds = train_ds.repeat(count=-1)
     train_ds = train_ds.batch(batch_size)
     train_ds = train_ds.prefetch(tf.data.experimental.AUTOTUNE)
@@ -78,7 +78,9 @@ if __name__ == "__main__":
     iterator = train_ds.__iter__()
 
     # model_path = 'E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5'
-    model_path = './outputs/checkpoints/SRResNet-MSE/est_weights.hdf5'
+    model_path = './outputs/checkpoints/SRResNet-MSE/best_weights.hdf5'
+    # model_path = './saved_weights/SRResNet-MSE-32bs-3e-u18/best_weights.hdf5'
+    model_path2 = './saved_weights/SRResNet-MSE/best_weights.hdf5'
     # model_path = 'E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5'
 
     # lr_images, hr_images = batch_gen.next()
@@ -87,14 +89,19 @@ if __name__ == "__main__":
     generator = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
     generator.load_weights(model_path)
 
+    generator2 = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
+    generator2.load_weights(model_path2)
+
     predicted_images = generator.predict(lr_images)
+    predicted_images2 = generator2.predict(lr_images)
 
     for index in range(batch_size):
         fig = plt.figure()
         ax = fig.add_subplot(3, 1, 1)
-        ax.imshow(utils.deprocess_LR(lr_images[index]).astype(np.uint8))
+        # ax.imshow(utils.deprocess_LR(lr_images[index]).astype(np.uint8))temporal
+        ax.imshow(utils.deprocess_HR(predicted_images2[index]).astype(np.uint8))
         ax.axis("off")
-        ax.set_title("Low-resolution")
+        ax.set_title("6 batch size")
 
         ax = fig.add_subplot(3, 1, 2)
         ax.imshow(utils.deprocess_HR(hr_images[index]).astype(np.uint8))
@@ -104,6 +111,7 @@ if __name__ == "__main__":
         ax = fig.add_subplot(3, 1, 3)
         ax.imshow(utils.deprocess_HR(predicted_images[index]).astype(np.uint8))
         ax.axis("off")
-        ax.set_title("Generated")
+        ax.set_title("32 batch size")
 
-        fig.savefig('./outputs/salida.png')
+        plt.show()
+        # fig.savefig('./outputs/salida.png')

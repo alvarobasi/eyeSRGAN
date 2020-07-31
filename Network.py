@@ -6,10 +6,10 @@ from tensorflow.python.keras.models import Model
 
 # Residual block.
 def res_block(inputs, axis, shared_axis):
-    x = Conv2D(64, kernel_size=(3, 3), strides=(1, 1), padding='same')(inputs)
+    x = Conv2D(64, kernel_size=(3, 3), strides=(1, 1), padding='same', activation=None, use_bias=False)(inputs)
     x = BatchNormalization(axis=axis)(x)
     x = PReLU(alpha_initializer='zeros', alpha_regularizer=None, alpha_constraint=None, shared_axes=shared_axis)(x)
-    x = Conv2D(64, kernel_size=(3, 3), strides=(1, 1), padding='same')(x)
+    x = Conv2D(64, kernel_size=(3, 3), strides=(1, 1), padding='same', activation=None, use_bias=False)(x)
     x = BatchNormalization(axis=axis)(x)
 
     return add([x, inputs])
@@ -43,6 +43,8 @@ class Generator(object):
         self.input_shape = input_shape
 
     def build(self):
+        # Input shape selection depending on if data_format is 'channels_last' or 'channels_first'.
+        # If input_shape is None, the Generator won't have any defined input shape.
         if self.input_shape is None:
             input_generator = Input(shape=(None, None, 3) if self.data_format == 'channels_last' else (3, None, None))
         else:
@@ -59,38 +61,36 @@ class Generator(object):
 
         x = x_input_res_block
 
-        # Add B residual blocks.
+        # Add B = 16 residual blocks.
         for _ in range(self.B):
             x = res_block(x, self.axis, self.shared_axis)
 
-        x = Conv2D(64, kernel_size=(3, 3), strides=(1, 1), padding='same')(x)
+        x = Conv2D(64, kernel_size=(3, 3), strides=(1, 1), padding='same', activation=None, use_bias=False)(x)
         x = BatchNormalization(axis=self.axis)(x)
 
-        # Skip connection.
         x = add([x, x_input_res_block])
 
-        # Two upsampling blocks.
+        # Upsampling blocks.
         x = up_block(x, self.shared_axis)
         x = up_block(x, self.shared_axis)
 
         # Output of the generator. Convolution layer with tanh activation ([-1, 1] image values).
         output_generator = Conv2D(3, kernel_size=(9, 9),
                                   strides=(1, 1), activation='tanh',
-                                  use_bias=False, padding='same')(x)
+                                  use_bias=False, padding='same', dtype=tf.float32)(x)
 
         # Model creation.
         generator = Model(inputs=input_generator, outputs=output_generator, name="Generator")
 
         # tf.keras.utils.plot_model(generator, 'E:\\TFM\\outputs\\model_imgs\\generator_model.png',
         #                           show_shapes=True)
-
         return generator
 
 
 # Convolutional block.
 def conv_block(x, filters, kernel_size, strides, axis):
     x = Conv2D(filters, kernel_size=kernel_size, strides=strides,
-               activation=None, padding='same')(x)
+               activation=None, use_bias=False, padding='same')(x)
     x = BatchNormalization(axis=axis)(x)
     x = LeakyReLU(alpha=0.2)(x)
     return x
@@ -127,7 +127,7 @@ class Discriminator(object):
         x = conv_block(x, filters=512, kernel_size=(3, 3), strides=(1, 1), axis=self.axis)
         x = conv_block(x, filters=512, kernel_size=(4, 4), strides=(2, 2), axis=self.axis)
         x = Flatten(data_format=self.data_format)(x)
-        x = Dense(1024)(x)
+        x = Dense(1024, activation=None)(x)
         x = LeakyReLU(alpha=0.2)(x)
         output_discriminator = Dense(1, activation='sigmoid')(x)
 

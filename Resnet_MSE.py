@@ -12,28 +12,15 @@ import math
 # from custom_generator import DataGenerator
 from tensorflow.python.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 
-
-# # @tf.function
-# def _map_fn(image_path):
-#     image_high_res = tf.io.read_file(image_path)
-#     image_high_res = tf.image.decode_png(image_high_res, channels=3)
-#     image_high_res = tf.image.convert_image_dtype(image_high_res, dtype=tf.float32)
-#     # image_high_res = tf.image.resize(image_high_res, size=[128, 128])  # TEMPORAL
-#     image_high_res = tf.image.random_flip_left_right(image_high_res)
-#     image_low_res = tf.image.resize(image_high_res, size=[21, 97])
-#     # image_low_res = tf.image.resize(image_high_res, size=[32, 32])
-#     image_high_res = (image_high_res - 0.5) * 2
-
-#     return image_low_res, image_high_res
-
+@tf.function
 def _map_fn(image_path):
     image_high_res = tf.io.read_file(image_path)
     image_high_res = tf.image.decode_jpeg(image_high_res, channels=3)
     image_high_res = tf.image.convert_image_dtype(image_high_res, dtype=tf.float32)
-    image_high_res = tf.image.resize(image_high_res, size=[256, 256])  # TEMPORAL
+    # image_high_res = tf.image.resize(image_high_res, size=[256, 256])  # FOR CELEBA DATASET
     image_high_res = tf.image.random_flip_left_right(image_high_res)
-    # image_low_res = tf.image.resize(image_high_res, size=[21, 97])
-    image_low_res = tf.image.resize(image_high_res, size=[64, 64]) # TEMPORAL
+    image_low_res = tf.image.resize(image_high_res, size=[21, 97])
+    # image_low_res = tf.image.resize(image_high_res, size=[64, 64]) # FRO CELEBA DATASET
     image_high_res = (image_high_res - 0.5) * 2
 
     return image_low_res, image_high_res
@@ -42,7 +29,7 @@ def _map_fn(image_path):
 if __name__ == "__main__":
 
     # Activa o desactiva la compilación XLA para acelerar un poco el entrenamiento.
-    tf.config.optimizer.set_jit(True)
+    tf.config.optimizer.set_jit(False)
 
     # Variable temporal para activar o desactivar AMP.
     amp_mode = True
@@ -70,17 +57,17 @@ if __name__ == "__main__":
     print("Image format: ", tf.keras.backend.image_data_format())
     utils.print_available_devices()
 
-    batch_size = 10
-    # target_shape = (84, 388)
-    target_shape = (256, 256)
+    batch_size = 16
+    target_shape = (84, 388)
+    # target_shape = (256, 256)
     # target_shape = (128, 128)
     downscale_factor = 4
 
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    # dataset_path = './datasets/A_guadiana_final/'
-    dataset_path = './datasets/img_align_celeba/'
+    dataset_path = './datasets/A_guadiana_final/'
+    # dataset_path = './datasets/img_align_celeba/'
 
     if data_format == 'channels_last':
         target_shape = target_shape + (3,)
@@ -89,23 +76,19 @@ if __name__ == "__main__":
         target_shape = (3,) + target_shape
         shape = (3, target_shape[1] // downscale_factor, target_shape[2] // downscale_factor)
 
-    # Experimental para hacer la consulta al github de tensorflow.
-    # image_list = np.random.rand(2022, 218, 178, 3).astype('float32')
+    list_file_path = './outputs/listado_imagenes.npy'
+    if os.path.isfile(list_file_path):
+        list_files = np.load(list_file_path)
+    else:
+        list_files = utils.get_list_of_files(dataset_path)
+        np.save(list_file_path, list_files)
 
-    # # list_file_path = 'E:\\TFM\\outputs\\listado_imagenes.npy'
-    # list_file_path = './outputs/listado_imagenes.npy'
-    # if os.path.isfile(list_file_path):
-    #     list_files = np.load(list_file_path)
-    # else:
-    #     list_files = utils.get_list_of_files(dataset_path)
-    #     np.save(list_file_path, list_files)
-
-    list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
+    # list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
 
     np.random.shuffle(list_files)
 
-    # train_files = list_files[:100000]
-    # val_files = list_files[100001:]
+    train_files = list_files[:100000]
+    val_files = list_files[100001:]
 
     # Dataset creation.temporal
     train_ds = tf.data.Dataset.from_tensor_slices(list_files)
@@ -116,16 +99,15 @@ if __name__ == "__main__":
     train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
 
-    # # Dataset creation validation
-    # valid_ds = tf.data.Dataset.from_tensor_slices(val_files)
-    # valid_ds = valid_ds.map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    # valid_ds = valid_ds.batch(batch_size)
-    # valid_ds = valid_ds.shuffle(buffer_size=1000)
-    # valid_ds = valid_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    # Dataset creation validation
+    valid_ds = tf.data.Dataset.from_tensor_slices(val_files)
+    valid_ds = valid_ds.map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    valid_ds = valid_ds.batch(batch_size)
+    valid_ds = valid_ds.shuffle(buffer_size=1000)
+    valid_ds = valid_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     epochs = 5
     steps_per_epoch = int(len(list_files) // batch_size)
-    # epochs = int(num_steps // steps_per_epoch)
 
     common_optimizer = tf.keras.optimizers.Adam(lr=(1e-4)*math.sqrt(5), beta_1=0.9)
 
@@ -165,4 +147,4 @@ if __name__ == "__main__":
     callbacks = [checkpoint, best_checkpoint, early_stop]
 
     history = generator.fit(x=train_ds, epochs=epochs, steps_per_epoch=steps_per_epoch,
-                            callbacks=callbacks)
+                            callbacks=callbacks, validation_data=valid_ds)

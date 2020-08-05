@@ -2,7 +2,7 @@ import os
 import re
 import numpy as np
 import json
-import cv2
+import cv2 as cv
 import matplotlib.pyplot as plt
 import utils
 import multiprocessing as mp
@@ -45,14 +45,14 @@ def img_proc(file_name):
     max_height = 84
     max_width = 388
 
-    img = cv2.imread(file_name, cv2.IMREAD_COLOR)
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, thresholded = cv2.threshold(gray_img, 1, 255, cv2.THRESH_BINARY)
+    img = cv.imread(file_name, cv.IMREAD_COLOR)
+    # img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+    gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+    _, thresholded = cv.threshold(gray_img, 1, 255, cv.THRESH_BINARY)
 
-    contours, _ = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv.findContours(thresholded, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     contour = contours[0]
-    X, Y, W, H = cv2.boundingRect(contour)
+    X, Y, W, H = cv.boundingRect(contour)
 
     cropped = img[(Y + 1):(Y - 1) + H, (X + 1):(X - 1) + W]
     h, w, d = cropped.shape
@@ -63,18 +63,20 @@ def img_proc(file_name):
     left = (max_width - w) // 2
     right = (max_width - w) - left
 
-    result = cv2.copyMakeBorder(cropped, top, bot, left, right, cv2.BORDER_REPLICATE)
+    # result = cv.copyMakeBorder(cropped, top, bot, left, right, cv.BORDER_REPLICATE)
+    value = [255, 0, 0]
+    result = cv.copyMakeBorder(cropped, top, bot, left, right, cv.BORDER_CONSTANT, None, value)
 
     base_name = os.path.splitext(file_name)[0]
-    output_path = f'{base_name}_padded.png'
-    cv2.imwrite(output_path, result)
+    output_path = f'{base_name}_padded_green.png'
+    cv.imwrite(output_path, result)
 
 
 if __name__ == "__main__":
 
-    dataset_path = 'datasets/A_guadiana_final/'
-    # output_path = 'E:\\TFM\\'
-    list_file_path = 'E:\\TFM\\outputs\\listado_imagenes.npy'
+    dataset_path = './datasets/A_guadiana_final/'
+
+    list_file_path = './outputs/listado_imagenes.npy'
     if os.path.isfile(list_file_path):
         list_files = np.load(list_file_path)
     else:

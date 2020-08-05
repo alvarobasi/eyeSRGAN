@@ -30,7 +30,7 @@ def _map_fn(image_path):
 
     return image_low_res, image_high_res
 
-
+# Credits to https://github.com/JGuillaumin.
 def preprocess_vgg(x):
     # scale from [-1,1] to [0, 255]
     x += 1.
@@ -54,6 +54,14 @@ def vgg_loss(y_true, y_pred):
     return 0.006 * K.mean(K.square(features_extractor(preprocess_vgg(y_pred)) -
                                    features_extractor(preprocess_vgg(y_true))),
                           axis=-1)
+
+def masked_vgg_loss(mask_value):
+    def vgg_loss(y_true, y_pred):
+        mask_true = K.cast(K.not_equal(y_true, mask_value), K.floatx())
+        return 0.006 * K.mean(K.square(features_extractor(preprocess_vgg(y_pred)) - features_extractor(preprocess_vgg(y_true))), axis=-1)
+
+    vgg_loss.__name__ = str('Masked MSE (mask_value={})'.format(mask_value))
+    return vgg_loss
 
 
 def build_vgg(target_shape_vgg):
@@ -119,15 +127,6 @@ if __name__ == "__main__":
     dataset_path = './datasets/A_guadiana_final/'
     # dataset_path = './datasets/img_align_celeba/'
 
-    # batch_gen = DataGenerator(path=dataset_path,
-    #                           batch_size=batch_size,
-    #                           downscale_factor=4,
-    #                           target_shape=target_shape,
-    #                           shuffle=True,
-    #                           crop_mode='fixed_size',
-    #                           color_mode='rgb',
-    #                           data_format=data_format)
-
     if data_format == 'channels_last':
         target_shape = target_shape + (3,)
         shape = (target_shape[0] // downscale_factor, target_shape[1] // downscale_factor, 3)
@@ -135,13 +134,15 @@ if __name__ == "__main__":
         target_shape = (3,) + target_shape
         shape = (3, target_shape[1] // downscale_factor, target_shape[2] // downscale_factor)
 
-    # list_file_path = './outputs/listado_imagenes.npy'
-    # if os.path.isfile(list_file_path):
-    #     list_files = np.load(list_file_path)
-    # else:
-    #     list_files = utils.get_list_of_files(dataset_path)
-    #     np.save(list_file_path, list_files)
-    list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
+    list_file_path = './outputs/listado_imagenes.npy'
+    if os.path.isfile(list_file_path):
+        list_files = np.load(list_file_path)
+    else:
+        list_files = utils.get_list_of_files(dataset_path)
+        np.save(list_file_path, list_files)
+
+    # list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
+
     np.random.shuffle(list_files)
 
     # Dataset creation.temporal

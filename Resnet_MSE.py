@@ -4,6 +4,7 @@ import platform
 
 import numpy as np
 import tensorflow as tf
+import tensorflow.python.keras.backend as K
 
 import Network
 import utils
@@ -26,6 +27,14 @@ def _map_fn(image_path):
     return image_low_res, image_high_res
 
 
+def masked_mse(y_true, y_pred):
+    mask_value=(0, 0, 255)
+    mask_true = K.cast(K.not_equal(y_true, mask_value), K.floatx())
+    masked_squared_error = K.square(mask_true * (y_true - y_pred))
+    masked_mse = K.sum(masked_squared_error, axis=-1) / K.sum(mask_true, axis=-1)
+    return masked_mse
+
+
 if __name__ == "__main__":
 
     # Activa o desactiva la compilación XLA para acelerar un poco el entrenamiento.
@@ -37,9 +46,9 @@ if __name__ == "__main__":
     # Formatos permitidos para la base de datos de Celeba.
     allowed_formats = {'png', 'jpg', 'jpeg', 'bmp'}
 
-    # Si no pongo esto, por alguna razón casca. Da error de cuDNN. 
-    physical_devices = tf.config.experimental.list_physical_devices('GPU')
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    # # Si no pongo esto, por alguna razón casca. Da error de cuDNN. 
+    # physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    # tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
     # Si se desea entrenar con los tensor cores, mixed_float16.
     if amp_mode:
@@ -109,7 +118,7 @@ if __name__ == "__main__":
     epochs = 5
     steps_per_epoch = int(len(list_files) // batch_size)
 
-    common_optimizer = tf.keras.optimizers.Adam(lr=(1e-4)*math.sqrt(5), beta_1=0.9)
+    common_optimizer = tf.keras.optimizers.Adam(lr=1e-4, beta_1=0.9)
 
     # if os.path.isdir('./outputs/checkpoints/SRResNet-MSE/'):
     #     shutil.rmtree('./outputs/checkpoints/SRResNet-MSE/')
@@ -118,6 +127,7 @@ if __name__ == "__main__":
     generator = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
     # generator.load_weights('./outputs/checkpoints/SRResNet-MSE/best_weights.hdf5')
     generator.compile(loss='mse', optimizer=common_optimizer)
+    # generator.compile(loss=masked_mse, optimizer=common_optimizer)
 
     checkpoint = ModelCheckpoint(
         filepath='./outputs/checkpoints/SRResNet-MSE/weights.{''epoch:02d}-{'
@@ -138,13 +148,14 @@ if __name__ == "__main__":
     early_stop = EarlyStopping(monitor='loss', min_delta=0, patience=2, verbose=1, mode='min')
 
     # log_dir = "logs/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    # tensorboard_callback = TensorBoard(log_dir='logs/',
-    #                                    histogram_freq=1,
-    #                                    update_freq=500,
-    #                                    profile_batch='200,300'
-    #                                    )
 
-    callbacks = [checkpoint, best_checkpoint, early_stop]
+    tensorboard_callback = TensorBoard(log_dir='logs/',
+                                       histogram_freq=1,
+                                       update_freq=500,
+                                       profile_batch='200,300'
+                                       )
+
+    callbacks = [tensorboard_callback, checkpoint, best_checkpoint, early_stop]
 
     history = generator.fit(x=train_ds, epochs=epochs, steps_per_epoch=steps_per_epoch,
                             callbacks=callbacks, validation_data=valid_ds)

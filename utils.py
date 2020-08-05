@@ -109,7 +109,7 @@ def get_list_of_files(folder):
         # If entry is a directory then get the list of files in this directory
         if os.path.isdir(full_path):
             output_files = output_files + get_list_of_files(full_path)
-        elif re.match(r'\d{2}_padded.png', entry):  # COMENTADO PARA RECOGER IMÁGENES REALES
+        elif re.match(r'\d{2}_padded_green.png', entry):  # COMENTADO PARA RECOGER IMÁGENES REALES
             # elif re.match(r'\d{2}.png', entry):
             output_files.append(full_path)
     return output_files

@@ -10,7 +10,7 @@ The purpose of this repository is, in one hand, to show an example of how to imp
 
 ![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/RESULTS.png)
 
-- Gaze estimation results.
+- Gaze estimation results. ([Paper](https://openaccess.thecvf.com/content_ICCVW_2019/papers/OpenEDS/Porta_U2Eyes_A_Binocular_Dataset_for_Eye_Tracking_and_Gaze_Estimation_ICCVW_2019_paper.pdf))
 
 ![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/all_models_3.png)
 

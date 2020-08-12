@@ -7,12 +7,17 @@ The purpose of this repository is, in one hand, to show an example of how to imp
 
 ### Results ###
 - Visual results.
+
 ![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/RESULTS.png)
 
 - Gaze estimation results.
+
 ![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/all_models_3.png)
 
 - Pupil center estimation using an SDM algorithm ([Paper](https://openaccess.thecvf.com/content_ICCVW_2019/html/OpenEDS/Porta_U2Eyes_A_Binocular_Dataset_for_Eye_Tracking_and_Gaze_Estimation_ICCVW_2019_paper.html)).
-![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/User18_comparison.png) Comparison between original and SR-generated images using an SRGAN model.
-![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/User18_comparison_mse.png) Comparison between original and SR-generated images using an ResNet-MSE model.
-![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/User18_comparison_bic.png) Comparison between original and SR-generated images using a bicubic algorithm.
+Comparison between original and SR-generated images using an SRGAN model.
+![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/User18_comparison.png)
+Comparison between original and SR-generated images using an ResNet-MSE model.
+![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/User18_comparison_mse.png)
+Comparison between original and SR-generated images using a bicubic algorithm.
+![alt text](https://github.com/alvarobasi/eyeSRGAN/blob/master/images/User18_comparison_bic.png)

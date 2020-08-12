@@ -1,29 +1,8 @@
-# README #
+# eyeSRGAN #
 
-This README would normally document whatever steps are necessary to get your application up and running.
+This project consists on a Tensorflow 2.2.0 implementation of an SRGAN model based on paper (https://arxiv.org/abs/1609.04802) applied to eye resolution in order to improve gaze estimation techniques by reducing the computing requirements or by improving estiamtion accuracy.
 
 ### What is this repository for? ###
+The purpose of this repository is, in one hand, to show an example of how to implement an SRGAN model using one of the most recent versions of Tensorflow and, on the other hand, to show a possible application of super resolution techniques. This project was developed as my final master's degree project which was presented on July the 3rd at the Public University of Navarre. The project was completed with honors.
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
-
-### How do I get set up? ###
-
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
-
-### Contribution guidelines ###
-
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+### Results ###

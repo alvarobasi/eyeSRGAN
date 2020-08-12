@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:nightly-gpu
+FROM tensorflow/tensorflow:latest-gpu
 
 # Avoid warnings by switching to noninteractive
 ENV DEBIAN_FRONTEND=noninteractive

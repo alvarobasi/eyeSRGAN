@@ -10,34 +10,35 @@ import Network
 import utils
 import math
 
-# from custom_generator import DataGenerator
 from tensorflow.python.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
+
 
 @tf.function
 def _map_fn(image_path):
     image_high_res = tf.io.read_file(image_path)
     image_high_res = tf.image.decode_jpeg(image_high_res, channels=3)
     image_high_res = tf.image.convert_image_dtype(image_high_res, dtype=tf.float32)
-    # image_high_res = tf.image.resize(image_high_res, size=[256, 256])  # FOR CELEBA DATASET
     image_high_res = tf.image.random_flip_left_right(image_high_res)
     image_low_res = tf.image.resize(image_high_res, size=[21, 97])
-    # image_low_res = tf.image.resize(image_high_res, size=[64, 64]) # FRO CELEBA DATASET
     image_high_res = (image_high_res - 0.5) * 2
 
     return image_low_res, image_high_res
 
 
 def masked_mse(y_true, y_pred):
-    mask_value=(0, 0, 255)
+    mask_value = K.constant([[[-1.0, -1.0, 1.0]]])
     mask_true = K.cast(K.not_equal(y_true, mask_value), K.floatx())
     masked_squared_error = K.square(mask_true * (y_true - y_pred))
-    masked_mse = K.sum(masked_squared_error, axis=-1) / K.sum(mask_true, axis=-1)
-    return masked_mse
+    # in case mask_true is 0 everywhere, the error would be nan, therefore divide by at least 1
+    # this doesn't change anything as where sum(mask_true)==0, sum(masked_squared_error)==0 as well
+    masked = K.sum(masked_squared_error, axis=-1) / K.maximum(K.sum(mask_true, axis=-1), 1)
+    return masked
 
 
 if __name__ == "__main__":
 
     # Activa o desactiva la compilación XLA para acelerar un poco el entrenamiento.
+    tf.keras.backend.clear_session()
     tf.config.optimizer.set_jit(False)
 
     # Variable temporal para activar o desactivar AMP.
@@ -46,7 +47,7 @@ if __name__ == "__main__":
     # Formatos permitidos para la base de datos de Celeba.
     allowed_formats = {'png', 'jpg', 'jpeg', 'bmp'}
 
-    # # Si no pongo esto, por alguna razón casca. Da error de cuDNN. 
+    # # Si no pongo esto, por alguna razón casca. Da error de cuDNN.
     # physical_devices = tf.config.experimental.list_physical_devices('GPU')
     # tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
@@ -68,8 +69,6 @@ if __name__ == "__main__":
 
     batch_size = 16
     target_shape = (84, 388)
-    # target_shape = (256, 256)
-    # target_shape = (128, 128)
     downscale_factor = 4
 
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
@@ -96,38 +95,37 @@ if __name__ == "__main__":
 
     np.random.shuffle(list_files)
 
-    train_files = list_files[:100000]
-    val_files = list_files[100001:]
+    train_files = list_files[:87000]
+    val_files = list_files[87001:]
 
     # Dataset creation.temporal
-    train_ds = tf.data.Dataset.from_tensor_slices(list_files)
+    train_ds = tf.data.Dataset.from_tensor_slices(train_files)
     train_ds = train_ds.map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     train_ds = train_ds.batch(batch_size)
-    train_ds = train_ds.shuffle(buffer_size=1000)
+    train_ds = train_ds.shuffle(buffer_size=500)
     train_ds = train_ds.repeat(count=-1)
     train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-
 
     # Dataset creation validation
     valid_ds = tf.data.Dataset.from_tensor_slices(val_files)
     valid_ds = valid_ds.map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     valid_ds = valid_ds.batch(batch_size)
-    valid_ds = valid_ds.shuffle(buffer_size=1000)
+    valid_ds = valid_ds.shuffle(buffer_size=500)
     valid_ds = valid_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     epochs = 5
     steps_per_epoch = int(len(list_files) // batch_size)
 
-    common_optimizer = tf.keras.optimizers.Adam(lr=1e-4, beta_1=0.9)
+    common_optimizer = tf.keras.optimizers.Adam(lr=1e-4 * math.sqrt(1.67), beta_1=0.9)
 
-    # if os.path.isdir('./outputs/checkpoints/SRResNet-MSE/'):
-    #     shutil.rmtree('./outputs/checkpoints/SRResNet-MSE/')
-    # os.makedirs('./outputs/checkpoints/SRResNet-MSE/')
+    if os.path.isdir('./outputs/checkpoints/SRResNet-MSE/'):
+        shutil.rmtree('./outputs/checkpoints/SRResNet-MSE/')
+    os.makedirs('./outputs/checkpoints/SRResNet-MSE/')
 
     generator = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
     # generator.load_weights('./outputs/checkpoints/SRResNet-MSE/best_weights.hdf5')
-    generator.compile(loss='mse', optimizer=common_optimizer)
-    # generator.compile(loss=masked_mse, optimizer=common_optimizer)
+    # generator.compile(loss='mse', optimizer=common_optimizer)
+    generator.compile(loss=masked_mse, optimizer=common_optimizer)
 
     checkpoint = ModelCheckpoint(
         filepath='./outputs/checkpoints/SRResNet-MSE/weights.{''epoch:02d}-{'
@@ -145,14 +143,13 @@ if __name__ == "__main__":
         save_freq=2000,
         verbose=2)
 
-    early_stop = EarlyStopping(monitor='loss', min_delta=0, patience=2, verbose=1, mode='min')
+    early_stop = EarlyStopping(monitor='loss', min_delta=0.0001, patience=2, verbose=1, mode='min')
 
     # log_dir = "logs/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
     tensorboard_callback = TensorBoard(log_dir='logs/',
                                        histogram_freq=1,
-                                       update_freq=500,
-                                       profile_batch='200,300'
+                                       update_freq=100
                                        )
 
     callbacks = [tensorboard_callback, checkpoint, best_checkpoint, early_stop]

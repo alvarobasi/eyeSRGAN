@@ -15,7 +15,7 @@ from tensorflow.python.keras.models import Model
 import Network
 import utils
 
-#import custom_generator
+# import custom_generator
 
 from tensorflow.python.keras.layers import Input
 
@@ -29,6 +29,7 @@ def _map_fn(image_path):
     image_high_res = (image_high_res - 0.5) * 2
 
     return image_low_res, image_high_res
+
 
 # Credits to https://github.com/JGuillaumin.
 def preprocess_vgg(x):
@@ -55,13 +56,14 @@ def vgg_loss(y_true, y_pred):
                                    features_extractor(preprocess_vgg(y_true))),
                           axis=-1)
 
-def masked_vgg_loss(mask_value):
-    def vgg_loss(y_true, y_pred):
-        mask_true = K.cast(K.not_equal(y_true, mask_value), K.floatx())
-        return 0.006 * K.mean(K.square(features_extractor(preprocess_vgg(y_pred)) - features_extractor(preprocess_vgg(y_true))), axis=-1)
 
-    vgg_loss.__name__ = str('Masked MSE (mask_value={})'.format(mask_value))
-    return vgg_loss
+def masked_vgg_loss(y_true, y_pred):
+    mask_value = K.constant([[[-1.0, -1.0, 1.0]]])
+    mask_true = K.cast(K.not_equal(y_true, mask_value), K.floatx())
+    masked = K.mean(K.square((features_extractor(preprocess_vgg(mask_true * y_pred)) -
+                              features_extractor(preprocess_vgg(mask_true * y_true)))), axis=-1)
+
+    return 0.006 * masked
 
 
 def build_vgg(target_shape_vgg):
@@ -84,7 +86,9 @@ def get_gan_model(discriminator_gan, generator_gan, input_shape):
     output_discriminator = discriminator_gan(output_generator)
 
     gan_model = Model(inputs=input_gan, outputs=[output_generator, output_discriminator], name="SRGAN")
-    gan_model.compile(loss=[vgg_loss, 'binary_crossentropy'], loss_weights=[1, 1e-3],
+    # gan_model.compile(loss=[vgg_loss, 'binary_crossentropy'], loss_weights=[1, 1e-3],
+    #                   optimizer=common_optimizer)
+    gan_model.compile(loss=[masked_vgg_loss, 'binary_crossentropy'], loss_weights=[1, 1e-3],
                       optimizer=common_optimizer)
 
     # tf.keras.utils.plot_model(gan_model, 'E:\\TFM\\outputs\\model_imgs\\gan_model.png', show_shapes=True)
@@ -97,7 +101,7 @@ def get_gan_model(discriminator_gan, generator_gan, input_shape):
 if __name__ == "__main__":
 
     # Activa o desactiva la compilación XLA para acelerar un poco el entrenamiento.
-    tf.config.optimizer.set_jit(True)
+    tf.config.optimizer.set_jit(False)
 
     amp_mode = True
 
@@ -147,7 +151,7 @@ if __name__ == "__main__":
 
     # Dataset creation.temporal
     train_ds = tf.data.Dataset.from_tensor_slices(list_files)
-    train_ds = train_ds.shuffle(buffer_size=1000)
+    train_ds = train_ds.shuffle(buffer_size=500)
     train_ds = train_ds.repeat(count=-1)
     train_ds = train_ds.map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     train_ds = train_ds.batch(batch_size)
@@ -169,9 +173,9 @@ if __name__ == "__main__":
         axes[i, 0].imshow(utils.deprocess_LR(batch_LR.numpy()[i]).astype(np.uint8))
         axes[i, 1].imshow(utils.deprocess_HR(batch_HR.numpy()[i]).astype(np.uint8))
 
-    common_optimizer = tf.keras.optimizers.Adam(lr=1e-4, beta_1=0.9)
+    common_optimizer = tf.keras.optimizers.Adam(lr=1e-5, beta_1=0.9)
 
-    epochs = 2
+    epochs = 5
     steps_per_epoch = int(len(list_files) // batch_size)
 
     eval_freq = 1000
@@ -195,7 +199,7 @@ if __name__ == "__main__":
     discriminator.compile(loss='binary_crossentropy', optimizer=common_optimizer)
 
     generator = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
-    generator.load_weights('./saved_weights/SRResNet-MSE/best_weights.hdf5')
+    generator.load_weights('./saved_weights/SRGAN-VGG54/generator_best.h5')
     # generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5')
 
     features_extractor = build_vgg(target_shape)

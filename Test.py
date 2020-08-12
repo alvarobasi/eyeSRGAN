@@ -4,6 +4,8 @@ import tensorflow as tf
 import Network
 import utils
 import os
+
+
 # from custom_generator import DataGenerator
 
 
@@ -41,15 +43,6 @@ if __name__ == "__main__":
 
     dataset_path = './datasets/Removed/'
 
-    # batch_gen = DataGenerator(path=dataset_path,
-    #                           batch_size=batch_size,
-    #                           downscale_factor=4,
-    #                           target_shape=target_shape,
-    #                           shuffle=True,
-    #                           crop_mode='fixed_size',
-    #                           color_mode='rgb',
-    #                           data_format=data_format)
-
     if data_format == 'channels_last':
         target_shape = target_shape + (3,)
         shape = (target_shape[0] // downscale_factor, target_shape[1] // downscale_factor, 3)
@@ -65,7 +58,7 @@ if __name__ == "__main__":
         list_files = utils.get_list_of_files(dataset_path)
         np.save(list_file_path, list_files)
 
-    # np.random.shuffle(list_files)
+    np.random.shuffle(list_files)
 
     # Dataset creation.
     train_ds = tf.data.Dataset.from_tensor_slices(list_files).map(_map_fn,
@@ -77,11 +70,8 @@ if __name__ == "__main__":
 
     iterator = train_ds.__iter__()
 
-    # model_path = 'E:\\TFM\\outputs\\checkpoints\\SRResNet-MSE\\best_weights.hdf5'
-    model_path = './outputs/checkpoints/SRResNet-MSE/best_weights.hdf5'
-    # model_path = './saved_weights/SRResNet-MSE-32bs-3e-u18/best_weights.hdf5'
-    model_path2 = './saved_weights/SRResNet-MSE/best_weights.hdf5'
-    # model_path = 'E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5'
+    model_path = './outputs/checkpoints/SRGAN-VGG54/generator_best.h5'
+    model_path2 = './saved_weights/SRGAN-VGG54anterior/generator_best.h5'
 
     # lr_images, hr_images = batch_gen.next()
     lr_images, hr_images = next(iterator)
@@ -98,10 +88,10 @@ if __name__ == "__main__":
     for index in range(batch_size):
         fig = plt.figure()
         ax = fig.add_subplot(3, 1, 1)
-        # ax.imshow(utils.deprocess_LR(lr_images[index]).astype(np.uint8))temporal
+        ax.imshow(utils.deprocess_LR(lr_images[index]).astype(np.uint8))
         ax.imshow(utils.deprocess_HR(predicted_images2[index]).astype(np.uint8))
         ax.axis("off")
-        ax.set_title("6 batch size")
+        ax.set_title("W/o Mask")
 
         ax = fig.add_subplot(3, 1, 2)
         ax.imshow(utils.deprocess_HR(hr_images[index]).astype(np.uint8))
@@ -111,7 +101,7 @@ if __name__ == "__main__":
         ax = fig.add_subplot(3, 1, 3)
         ax.imshow(utils.deprocess_HR(predicted_images[index]).astype(np.uint8))
         ax.axis("off")
-        ax.set_title("32 batch size")
+        ax.set_title("10 batch size With_Mask")
 
         plt.show()
         # fig.savefig('./outputs/salida.png')

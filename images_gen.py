@@ -25,6 +25,10 @@ def _map_fn(image_path):
 
 if __name__ == "__main__":
 
+    # Si no pongo esto, por alguna razón casca. Da error de cuDNN.
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
     data_format = 'channels_last'
     allowed_formats = {'png', 'jpg', 'jpeg', 'bmp'}
     tf.keras.backend.set_image_data_format(data_format)
@@ -40,7 +44,8 @@ if __name__ == "__main__":
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    dataset_path = './datasets/A_guadiana_final/'
+    # dataset_path = './datasets/A_guadiana_final/'
+    dataset_path = './datasets/I2Head_x10_json/'
     # dataset_path = './datasets/I2Head_f_recortada/'
     # dataset_path = './datasets/train2017/'
     # batch_gen = DataGenerator(path=dataset_path,
@@ -65,20 +70,21 @@ if __name__ == "__main__":
 
     # Dataset creation.
     train_ds = tf.data.Dataset.from_tensor_slices(list_files).map(_map_fn,
-                                                                   num_parallel_calls=tf.data.experimental.AUTOTUNE)
+                                                                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
     train_ds = train_ds.batch(batch_size)
     train_ds = train_ds.prefetch(tf.data.experimental.AUTOTUNE)
 
     iterator = train_ds.__iter__()
 
     # model_path_srgan = 'E:\\TFM\\outputs\\Resultados_Test\\Sin_Textura_4\\checkpoints\\SRGAN-VGG54\\generator_best.h5'
-    model_path_srgan = 'saved_weights/SRGAN-VGG54/generator_best.h5'
-    model_path_mse = 'saved_weights/SRResNet-MSE/best_weights.hdf5'
+    # model_path_srgan = 'saved_weights/SRGAN-VGG54_lrchanged_wm_bs20_10epochs_earlys4_lower/generator_best.h5'
+    model_path_srgan = 'saved_weights/SRGAN-VGG54_lrchanged_wm_bs20_10epochs_earlys4_lower/generator_best.h5'
+    # model_path_mse = 'saved_weights/SRResNet-MSE/best_weights.hdf5'
     # model_path_srgan = 'saved_weights/SRGAN-VGG54-20bs-2e-u18/generator_best.h5'
 
     generator_srgan = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
 
-    generator_srgan.load_weights(model_path_mse)
+    generator_srgan.load_weights(model_path_srgan)
 
     for i, file in enumerate(list_files):
         print(i)
@@ -87,7 +93,7 @@ if __name__ == "__main__":
         predicted_images = generator_srgan.predict(lr_images)
 
         base_name = os.path.splitext(file)[0]
-        output_path = f'{base_name}_mse.png'
+        output_path = f'{base_name}_sr.png'
         io.imsave(output_path, utils.deprocess_HR(predicted_images[0]).astype(np.uint8))
         # io.imsave('./outputs/' + f'{i}_gen_sr.png', utils.deprocess_HR(predicted_images[0]).astype(np.uint8))
         # io.imsave('./outputs/' + f'{i}_orig.png', utils.deprocess_LR(crop_hr[0, :, :]).astype(np.uint8))

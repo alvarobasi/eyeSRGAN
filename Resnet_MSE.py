@@ -15,24 +15,36 @@ from tensorflow.python.keras.callbacks import ModelCheckpoint, EarlyStopping, Te
 
 @tf.function
 def _map_fn(image_path):
-    image_high_res = tf.io.read_file(image_path)
-    image_high_res = tf.image.decode_jpeg(image_high_res, channels=3)
-    image_high_res = tf.image.convert_image_dtype(image_high_res, dtype=tf.float32)
-    image_high_res = tf.image.random_flip_left_right(image_high_res)
-    image_low_res = tf.image.resize(image_high_res, size=[21, 97])
+    image = tf.io.read_file(image_path)
+    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    image_high_res = tf.image.random_crop(image, [96, 96, 3])
+    image_low_res = tf.image.resize(image_high_res, size=[24, 24])
     image_high_res = (image_high_res - 0.5) * 2
 
     return image_low_res, image_high_res
 
 
-def masked_mse(y_true, y_pred):
-    mask_value = K.constant([[[-1.0, -1.0, 1.0]]])
-    mask_true = K.cast(K.not_equal(y_true, mask_value), K.floatx())
-    masked_squared_error = K.square(mask_true * (y_true - y_pred))
-    # in case mask_true is 0 everywhere, the error would be nan, therefore divide by at least 1
-    # this doesn't change anything as where sum(mask_true)==0, sum(masked_squared_error)==0 as well
-    masked = K.sum(masked_squared_error, axis=-1) / K.maximum(K.sum(mask_true, axis=-1), 1)
-    return masked
+# @tf.function
+# def _map_fn(image_path):
+#     image_high_res = tf.io.read_file(image_path)
+#     image_high_res = tf.image.decode_jpeg(image_high_res, channels=3)
+#     image_high_res = tf.image.convert_image_dtype(image_high_res, dtype=tf.float32)
+#     image_high_res = tf.image.random_flip_left_right(image_high_res)
+#     image_low_res = tf.image.resize(image_high_res, size=[21, 97])
+#     image_high_res = (image_high_res - 0.5) * 2
+#
+#     return image_low_res, image_high_res
+
+
+# def masked_mse(y_true, y_pred):
+#     mask_value = K.constant([[[-1.0, -1.0, 1.0]]])
+#     mask_true = K.cast(K.not_equal(y_true, mask_value), K.floatx())
+#     masked_squared_error = K.square(mask_true * (y_true - y_pred))
+#     # in case mask_true is 0 everywhere, the error would be nan, therefore divide by at least 1
+#     # this doesn't change anything as where sum(mask_true)==0, sum(masked_squared_error)==0 as well
+#     masked = K.sum(masked_squared_error, axis=-1) / K.maximum(K.sum(mask_true, axis=-1), 1)
+#     return masked
 
 
 if __name__ == "__main__":
@@ -67,15 +79,16 @@ if __name__ == "__main__":
     print("Image format: ", tf.keras.backend.image_data_format())
     utils.print_available_devices()
 
-    batch_size = 16
-    target_shape = (84, 388)
+    batch_size = 64
+    target_shape = (96, 96)
     downscale_factor = 4
 
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    dataset_path = './datasets/A_guadiana_final/'
+    # dataset_path = './datasets/A_guadiana_final/'
     # dataset_path = './datasets/img_align_celeba/'
+    dataset_path = './datasets/train2017/'
 
     if data_format == 'channels_last':
         target_shape = target_shape + (3,)
@@ -88,21 +101,20 @@ if __name__ == "__main__":
     if os.path.isfile(list_file_path):
         list_files = np.load(list_file_path)
     else:
-        list_files = utils.get_list_of_files(dataset_path)
+        # list_files = utils.get_list_of_files(dataset_path)
+        list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
         np.save(list_file_path, list_files)
-
-    # list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
 
     np.random.shuffle(list_files)
 
-    train_files = list_files[:87000]
-    val_files = list_files[87001:]
+    train_files = list_files[:94628]
+    val_files = list_files[94629:]
 
     # Dataset creation.temporal
     train_ds = tf.data.Dataset.from_tensor_slices(train_files)
     train_ds = train_ds.map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     train_ds = train_ds.batch(batch_size)
-    train_ds = train_ds.shuffle(buffer_size=500)
+    # train_ds = train_ds.shuffle(buffer_size=500)
     train_ds = train_ds.repeat(count=-1)
     train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
@@ -110,22 +122,22 @@ if __name__ == "__main__":
     valid_ds = tf.data.Dataset.from_tensor_slices(val_files)
     valid_ds = valid_ds.map(_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     valid_ds = valid_ds.batch(batch_size)
-    valid_ds = valid_ds.shuffle(buffer_size=500)
+    # valid_ds = valid_ds.shuffle(buffer_size=500)
     valid_ds = valid_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-    epochs = 5
+    epochs = 20
     steps_per_epoch = int(len(list_files) // batch_size)
 
-    common_optimizer = tf.keras.optimizers.Adam(lr=1e-4 * math.sqrt(1.67), beta_1=0.9)
+    common_optimizer = tf.keras.optimizers.Adam(lr=1e-4 * math.sqrt(4), beta_1=0.9)
 
     if os.path.isdir('./outputs/checkpoints/SRResNet-MSE/'):
         shutil.rmtree('./outputs/checkpoints/SRResNet-MSE/')
     os.makedirs('./outputs/checkpoints/SRResNet-MSE/')
 
     generator = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
-    # generator.load_weights('./outputs/checkpoints/SRResNet-MSE/best_weights.hdf5')
-    # generator.compile(loss='mse', optimizer=common_optimizer)
-    generator.compile(loss=masked_mse, optimizer=common_optimizer)
+    generator.load_weights('./saved_weights/SRResNet-MSE_real_sqrt4_bs64_epochs10/best_weights.hdf5')
+    generator.compile(loss='mse', optimizer=common_optimizer)
+    # generator.compile(loss=masked_mse, optimizer=common_optimizer)
 
     checkpoint = ModelCheckpoint(
         filepath='./outputs/checkpoints/SRResNet-MSE/weights.{''epoch:02d}-{'

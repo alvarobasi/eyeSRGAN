@@ -74,7 +74,8 @@ def img_proc(file_name):
 
 if __name__ == "__main__":
 
-    dataset_path = './datasets/A_guadiana_final/'
+    # dataset_path = './datasets/A_guadiana_final/'
+    dataset_path = './datasets/I2Head_x10_json/'
 
     list_file_path = './outputs/listado_imagenes.npy'
     if os.path.isfile(list_file_path):

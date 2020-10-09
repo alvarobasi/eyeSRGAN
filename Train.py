@@ -15,20 +15,35 @@ from tensorflow.python.keras.models import Model
 import Network
 import utils
 
+import math
+
 # import custom_generator
 
 from tensorflow.python.keras.layers import Input
 
 
+@tf.function
 def _map_fn(image_path):
-    image_high_res = tf.io.read_file(image_path)
-    image_high_res = tf.image.decode_jpeg(image_high_res, channels=3)
-    image_high_res = tf.image.convert_image_dtype(image_high_res, dtype=tf.float32)
-    image_high_res = tf.image.random_flip_left_right(image_high_res)
-    image_low_res = tf.image.resize(image_high_res, size=[21, 97])
+    image = tf.io.read_file(image_path)
+    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    image_high_res = tf.image.random_crop(image, [96, 96, 3])
+    image_low_res = tf.image.resize(image_high_res, size=[24, 24])
     image_high_res = (image_high_res - 0.5) * 2
 
     return image_low_res, image_high_res
+
+
+# @tf.function
+# def _map_fn(image_path):
+#     image_high_res = tf.io.read_file(image_path)
+#     image_high_res = tf.image.decode_jpeg(image_high_res, channels=3)
+#     image_high_res = tf.image.convert_image_dtype(image_high_res, dtype=tf.float32)
+#     image_high_res = tf.image.random_flip_left_right(image_high_res)
+#     image_low_res = tf.image.resize(image_high_res, size=[21, 97])
+#     image_high_res = (image_high_res - 0.5) * 2
+#
+#     return image_low_res, image_high_res
 
 
 # Credits to https://github.com/JGuillaumin.
@@ -52,6 +67,8 @@ def preprocess_vgg(x):
 
 
 def vgg_loss(y_true, y_pred):
+    # return 0.006 * tf.keras.losses.mean_squared_error(features_extractor(preprocess_vgg(y_true)),
+    #                                                   features_extractor(preprocess_vgg(y_pred)))
     return 0.006 * K.mean(K.square(features_extractor(preprocess_vgg(y_pred)) -
                                    features_extractor(preprocess_vgg(y_true))),
                           axis=-1)
@@ -73,7 +90,8 @@ def build_vgg(target_shape_vgg):
     for layer in vgg19.layers:
         layer.trainable = False
 
-    vgg_model = Model(inputs=vgg19.input, outputs=vgg19.layers[20].output, name="VGG")
+    # vgg_model = Model(inputs=vgg19.input, outputs=vgg19.layers[20].output, name="VGG")
+    vgg_model = Model(inputs=vgg19.input, outputs=vgg19.get_layer("block5_conv4").output, name="VGG")
 
     return vgg_model
 
@@ -86,10 +104,10 @@ def get_gan_model(discriminator_gan, generator_gan, input_shape):
     output_discriminator = discriminator_gan(output_generator)
 
     gan_model = Model(inputs=input_gan, outputs=[output_generator, output_discriminator], name="SRGAN")
-    # gan_model.compile(loss=[vgg_loss, 'binary_crossentropy'], loss_weights=[1, 1e-3],
-    #                   optimizer=common_optimizer)
-    gan_model.compile(loss=[masked_vgg_loss, 'binary_crossentropy'], loss_weights=[1, 1e-3],
+    gan_model.compile(loss=[vgg_loss, 'binary_crossentropy'], loss_weights=[1, 1e-3],
                       optimizer=common_optimizer)
+    # gan_model.compile(loss=[masked_vgg_loss, 'binary_crossentropy'], loss_weights=[1, 1e-3],
+    #                   optimizer=common_optimizer)
 
     # tf.keras.utils.plot_model(gan_model, 'E:\\TFM\\outputs\\model_imgs\\gan_model.png', show_shapes=True)
 
@@ -103,7 +121,7 @@ if __name__ == "__main__":
     # Activa o desactiva la compilación XLA para acelerar un poco el entrenamiento.
     tf.config.optimizer.set_jit(False)
 
-    amp_mode = True
+    amp_mode = False
 
     allowed_formats = {'png', 'jpg', 'jpeg', 'bmp'}
 
@@ -121,14 +139,17 @@ if __name__ == "__main__":
     print("Image format: ", keras.backend.image_data_format())
     utils.print_available_devices()
 
-    batch_size = 10
-    target_shape = (84, 388)
+    batch_size = 16
+    target_shape = (96, 96)
+    # target_shape = (84, 388)
+
     downscale_factor = 4
 
     shared_axis = [1, 2] if data_format == 'channels_last' else [2, 3]
     axis = -1 if data_format == 'channels_last' else 1
 
-    dataset_path = './datasets/A_guadiana_final/'
+    # dataset_path = './datasets/A_guadiana_final/'
+    dataset_path = './datasets/train2017/'
     # dataset_path = './datasets/img_align_celeba/'
 
     if data_format == 'channels_last':
@@ -142,10 +163,9 @@ if __name__ == "__main__":
     if os.path.isfile(list_file_path):
         list_files = np.load(list_file_path)
     else:
-        list_files = utils.get_list_of_files(dataset_path)
+        # list_files = utils.get_list_of_files(dataset_path)
+        list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
         np.save(list_file_path, list_files)
-
-    # list_files = utils.list_valid_filenames_in_directory(dataset_path, allowed_formats)
 
     np.random.shuffle(list_files)
 
@@ -161,7 +181,7 @@ if __name__ == "__main__":
     batch_LR, batch_HR = next(iterator)
     # batch_LR, batch_HR = batch_gen.next()
 
-    print(batch_LR.numpy().shape)
+    print(batch_LR.numpy().shape) 
     print(batch_HR.numpy().shape)
 
     if data_format == 'channels_first':
@@ -174,13 +194,14 @@ if __name__ == "__main__":
         axes[i, 1].imshow(utils.deprocess_HR(batch_HR.numpy()[i]).astype(np.uint8))
 
     common_optimizer = tf.keras.optimizers.Adam(lr=1e-5, beta_1=0.9)
+    # common_optimizer = tf.keras.optimizers.RMSprop(lr=1e-4)
 
-    epochs = 5
+    epochs = 20
     steps_per_epoch = int(len(list_files) // batch_size)
 
-    eval_freq = 1000
+    eval_freq = 3000
     info_freq = 100
-    checkpoint_freq = 5000
+    checkpoint_freq = 3000
 
     if os.path.isdir('./outputs/checkpoints/SRGAN-VGG54/'):
         shutil.rmtree('./outputs/checkpoints/SRGAN-VGG54/')
@@ -195,12 +216,10 @@ if __name__ == "__main__":
     os.makedirs('./outputs/results/')
 
     discriminator = Network.Discriminator(input_shape=target_shape, axis=axis, data_format=data_format).build()
-    # discriminator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\discriminator.h5')
     discriminator.compile(loss='binary_crossentropy', optimizer=common_optimizer)
 
     generator = Network.Generator(data_format=data_format, axis=axis, shared_axis=shared_axis).build()
-    generator.load_weights('./saved_weights/SRGAN-VGG54/generator_best.h5')
-    # generator.load_weights('E:\\TFM\\outputs\\checkpoints\\SRGAN-VGG54\\generator_best.h5')
+    generator.load_weights('./saved_weights/SRGAN-VGG54_real_bs16_8epochs/generator_best.h5')
 
     features_extractor = build_vgg(target_shape)
 

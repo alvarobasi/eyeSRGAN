@@ -114,6 +114,7 @@ def get_list_of_files(folder):
             output_files.append(full_path)
     return output_files
 
+
 # # Función importada de Gonzalo. Va iterando a través de las carpetas hasta recorrer los directorios enteros en
 # busca de las imagenes. Devuelve la lista con todas las imagenes .png que cumplen con el patrón dado.
 # Se ha modificado la función para que coja las _padded.png
@@ -152,6 +153,7 @@ def get_list_of_files_gen(folder):
             # elif re.match(r'\d{2}.png', entry):
             output_files.append(full_path)
     return output_files
+
 
 # # Función importada de Gonzalo. Va iterando a través de las carpetas hasta recorrer los directorios enteros en
 # busca de las imagenes. Devuelve la lista con todas las imagenes .png que cumplen con el patrón dado.
